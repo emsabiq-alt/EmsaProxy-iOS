@@ -33,7 +33,8 @@ public class VPNManager: ObservableObject {
     private func createManager() {
         let manager = NETunnelProviderManager()
         let proto = NETunnelProviderProtocol()
-        proto.providerBundleIdentifier = "com.emsapro.EmsaProxy.EmsaProxyTunnel"
+        let parentId = Bundle.main.bundleIdentifier ?? "com.emsapro.EmsaProxy"
+        proto.providerBundleIdentifier = "\(parentId).Tunnel"
         proto.serverAddress = "127.0.0.1"
         manager.protocolConfiguration = proto
         manager.localizedDescription = "EmsaProxy"

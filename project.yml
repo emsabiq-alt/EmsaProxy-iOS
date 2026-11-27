@@ -16,6 +16,9 @@ targets:
     platform: iOS
     sources:
       - path: EmsaProxy
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.emsapro.EmsaProxy
     info:
       path: EmsaProxy/Info.plist
       properties:
@@ -40,6 +43,9 @@ targets:
     platform: iOS
     sources:
       - path: EmsaProxyTunnel
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.emsapro.EmsaProxy.Tunnel
     info:
       path: EmsaProxyTunnel/Info.plist
       properties:
