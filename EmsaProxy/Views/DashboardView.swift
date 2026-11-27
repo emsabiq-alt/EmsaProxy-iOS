@@ -3,6 +3,8 @@ import SwiftUI
 public struct DashboardView: View {
     @ObservedObject var vpn = VPNManager.shared
     @ObservedObject var store = ModuleStore.shared
+    @ObservedObject var nodeStore = NodeStore.shared
+    @ObservedObject var tracker = ConnectionTracker.shared
     @State private var outboundMode: String = "Rule"
 
     public var body: some View {
@@ -12,18 +14,18 @@ public struct DashboardView: View {
                     .ignoresSafeArea()
 
                 ScrollView {
-                    VStack(spacing: 20) {
-                        // Connection Status Card
+                    VStack(spacing: 18) {
+                        // Main Connection Card
                         VStack(spacing: 16) {
                             ZStack {
                                 Circle()
                                     .fill(vpn.isConnected ? Color.green.opacity(0.15) : Color.gray.opacity(0.15))
-                                    .frame(width: 100, height: 100)
+                                    .frame(width: 90, height: 90)
 
                                 Image(systemName: vpn.isConnected ? "shield.fill" : "shield.slash.fill")
                                     .resizable()
                                     .scaledToFit()
-                                    .frame(width: 48, height: 48)
+                                    .frame(width: 44, height: 44)
                                     .foregroundColor(vpn.isConnected ? .green : .gray)
                             }
 
@@ -32,15 +34,45 @@ public struct DashboardView: View {
                                     .font(.title2.bold())
                                     .foregroundColor(vpn.isConnected ? .green : .primary)
 
-                                Text(vpn.isConnected ? "TUN Interface: 198.18.0.1" : "Proxy Engine Idle")
+                                Text(vpn.isConnected ? "Virtual TUN Interface: 198.18.0.1" : "Tunnel Engine Standby")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
+                            }
+
+                            // Real-time Speed Meter (Active when connected)
+                            if vpn.isConnected {
+                                HStack(spacing: 24) {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "arrow.up.circle.fill")
+                                            .foregroundColor(.blue)
+                                        VStack(alignment: .leading, spacing: 1) {
+                                            Text(String(format: "%.1f KB/s", tracker.uploadSpeedKbps))
+                                                .font(.system(size: 13, weight: .bold, design: .monospaced))
+                                            Text("Upload")
+                                                .font(.system(size: 10))
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
+
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "arrow.down.circle.fill")
+                                            .foregroundColor(.green)
+                                        VStack(alignment: .leading, spacing: 1) {
+                                            Text(String(format: "%.1f KB/s", tracker.downloadSpeedKbps))
+                                                .font(.system(size: 13, weight: .bold, design: .monospaced))
+                                            Text("Download")
+                                                .font(.system(size: 10))
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
+                                }
+                                .padding(.vertical, 4)
                             }
 
                             Button(action: {
                                 vpn.toggleTunnel()
                             }) {
-                                Text(vpn.isConnected ? "Disconnect" : "Connect")
+                                Text(vpn.isConnected ? "Stop Proxy" : "Start Proxy")
                                     .font(.headline)
                                     .foregroundColor(.white)
                                     .frame(maxWidth: .infinity)
@@ -50,10 +82,56 @@ public struct DashboardView: View {
                             }
                             .padding(.horizontal, 20)
                         }
-                        .padding(.vertical, 24)
+                        .padding(.vertical, 20)
                         .background(Color(UIColor.secondarySystemGroupedBackground))
                         .cornerRadius(16)
                         .padding(.horizontal)
+
+                        // Active Proxy Node Selector Card
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack {
+                                Text("Active Outbound Node")
+                                    .font(.caption.bold())
+                                    .foregroundColor(.secondary)
+                                    .textCase(.uppercase)
+                                Spacer()
+                                NavigationLink(destination: NodesView()) {
+                                    Text("Change")
+                                        .font(.caption.bold())
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                            .padding(.horizontal)
+
+                            HStack {
+                                Image(systemName: "antenna.radiowaves.left.and.right")
+                                    .font(.title2)
+                                    .foregroundColor(.blue)
+                                    .frame(width: 40)
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(nodeStore.selectedProxyName)
+                                        .font(.system(size: 15, weight: .semibold))
+                                    Text("Policy: PROXY (Direct routing on bypass rules)")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+
+                                Spacer()
+
+                                Text("38 ms")
+                                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                                    .foregroundColor(.green)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color(UIColor.tertiarySystemGroupedBackground))
+                                    .cornerRadius(6)
+                            }
+                            .padding(14)
+                            .background(Color(UIColor.secondarySystemGroupedBackground))
+                            .cornerRadius(12)
+                            .padding(.horizontal)
+                        }
 
                         // Outbound Mode Picker
                         VStack(alignment: .leading, spacing: 10) {
@@ -65,7 +143,7 @@ public struct DashboardView: View {
 
                             Picker("Outbound Mode", selection: $outboundMode) {
                                 Text("Rule").tag("Rule")
-                                Text("Global Proxy").tag("Global")
+                                Text("Global").tag("Global")
                                 Text("Direct").tag("Direct")
                             }
                             .pickerStyle(.segmented)
@@ -89,8 +167,8 @@ public struct DashboardView: View {
                             )
 
                             StatCard(
-                                title: "DNS Servers",
-                                value: "1.1.1.1, 8.8.8.8",
+                                title: "DNS Engine",
+                                value: "Fake-IP DoH",
                                 icon: "network",
                                 color: .blue
                             )

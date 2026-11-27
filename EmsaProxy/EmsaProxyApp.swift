@@ -12,14 +12,24 @@ public struct EmsaProxyApp: App {
                         Label("Dashboard", systemImage: "shield.fill")
                     }
 
+                NodesView()
+                    .tabItem {
+                        Label("Nodes", systemImage: "antenna.radiowaves.left.and.right")
+                    }
+
                 ModulesView()
                     .tabItem {
                         Label("Modules", systemImage: "cube.box.fill")
                     }
 
-                ConfigView()
+                ActivityView()
                     .tabItem {
-                        Label("Config", systemImage: "slider.horizontal.3")
+                        Label("Activity", systemImage: "waveform.path.ecg")
+                    }
+
+                ToolsView()
+                    .tabItem {
+                        Label("Tools", systemImage: "wrench.and.screwdriver.fill")
                     }
             }
         }

@@ -8,7 +8,7 @@ public struct ModulesView: View {
     public var body: some View {
         NavigationView {
             List {
-                Section(header: Text("Installed Modules"), footer: Text("Modul memperluas kemampuan proksi dengan aturan routing, MITM HTTPS rewrite, dan JavaScript script hooks.")) {
+                Section(header: Text("Active Modules"), footer: Text("Modul memperluas kemampuan perutean EmsaProxy dengan aturan routing, URL rewrites, host mappings, MITM HTTPS, dan skrip JavaScriptCore.")) {
                     ForEach(store.modules) { module in
                         HStack(spacing: 12) {
                             VStack(alignment: .leading, spacing: 4) {
@@ -20,8 +20,11 @@ public struct ModulesView: View {
                                     .foregroundColor(.secondary)
                                     .lineLimit(2)
 
-                                HStack(spacing: 8) {
+                                HStack(spacing: 6) {
                                     BadgeView(text: "\(module.rules.count) Rules", color: .orange)
+                                    if !module.rewrites.isEmpty {
+                                        BadgeView(text: "\(module.rewrites.count) Rewrites", color: .blue)
+                                    }
                                     if !module.mitmHostnames.isEmpty {
                                         BadgeView(text: "\(module.mitmHostnames.count) MITM", color: .teal)
                                     }
@@ -85,28 +88,47 @@ struct BadgeView: View {
 struct AddModuleSheet: View {
     @ObservedObject var store: ModuleStore
     @Environment(\.presentationMode) var presentationMode
+    @State private var mode = 0 // 0 = URL, 1 = Raw Text
     @State private var moduleName: String = ""
+    @State private var urlString: String = ""
     @State private var moduleContent: String = ""
 
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("Module Info")) {
-                    TextField("Module Name (e.g. YouTube Clean)", text: $moduleName)
+                Picker("Import Mode", selection: $mode) {
+                    Text("Remote URL").tag(0)
+                    Text("Direct Text").tag(1)
                 }
+                .pickerStyle(.segmented)
 
-                Section(header: Text("Module Content (.module / .sgmodule)"), footer: Text("Dukung format blok [Rule], [MITM], dan [Script].")) {
-                    TextEditor(text: $moduleContent)
-                        .frame(minHeight: 180)
-                        .font(.system(.body, design: .monospaced))
+                if mode == 0 {
+                    Section(header: Text("Remote Module URL"), footer: Text("Mendukung tautan modul Egern (.module), Surge (.sgmodule), atau Shadowrocket (.conf).")) {
+                        TextField("https://raw.githubusercontent.com/.../adblock.module", text: $urlString)
+                            .keyboardType(.URL)
+                            .autocapitalization(.none)
+                        TextField("Display Name (Optional)", text: $moduleName)
+                    }
+                } else {
+                    Section(header: Text("Module Specification"), footer: Text("Dukung format blok [Rule], [URL Rewrite], [Host], [MITM], dan [Script].")) {
+                        TextField("Module Name (e.g. TikTok Unlock)", text: $moduleName)
+                        TextEditor(text: $moduleContent)
+                            .frame(minHeight: 180)
+                            .font(.system(.body, design: .monospaced))
+                    }
                 }
             }
             .navigationTitle("Import Module")
             .navigationBarItems(
                 leading: Button("Cancel") { presentationMode.wrappedValue.dismiss() },
                 trailing: Button("Save") {
-                    let name = moduleName.isEmpty ? "Custom Module" : moduleName
-                    let mod = store.parseModuleText(raw: moduleContent, defaultName: name)
+                    let name = moduleName.isEmpty ? (mode == 0 ? "Remote Subscription" : "Custom Module") : moduleName
+                    let mod: ProxyModule
+                    if mode == 0 {
+                        mod = ProxyModule(name: name, descriptionText: "Imported from \(urlString)", remoteUrl: urlString, isEnabled: true)
+                    } else {
+                        mod = store.parseModuleText(raw: moduleContent, defaultName: name)
+                    }
                     store.addModule(mod)
                     presentationMode.wrappedValue.dismiss()
                 }
@@ -123,12 +145,15 @@ struct ModuleDetailSheet: View {
         NavigationView {
             List {
                 Section(header: Text("Overview")) {
-                    LabeledRow(label: "Status", value: module.isEnabled ? "Enabled" : "Disabled")
+                    LabeledRow(label: "Status", value: module.isEnabled ? "Active (Enabled)" : "Disabled")
                     LabeledRow(label: "Description", value: module.descriptionText)
+                    if let url = module.remoteUrl {
+                        LabeledRow(label: "Source URL", value: url)
+                    }
                 }
 
                 if !module.rules.isEmpty {
-                    Section(header: Text("Rules (\(module.rules.count))")) {
+                    Section(header: Text("Routing Rules (\(module.rules.count))")) {
                         ForEach(module.rules) { rule in
                             HStack {
                                 Text(rule.ruleType)
@@ -139,7 +164,42 @@ struct ModuleDetailSheet: View {
                                 Spacer()
                                 Text(rule.policy)
                                     .font(.caption.bold())
-                                    .foregroundColor(rule.policy == "REJECT" ? .red : .blue)
+                                    .foregroundColor(rule.policy == "REJECT" ? .red : (rule.policy == "DIRECT" ? .green : .blue))
+                            }
+                        }
+                    }
+                }
+
+                if !module.rewrites.isEmpty {
+                    Section(header: Text("URL Rewrites (\(module.rewrites.count))")) {
+                        ForEach(module.rewrites) { rw in
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack {
+                                    Text(rw.actionType.uppercased())
+                                        .font(.system(size: 10, weight: .bold))
+                                        .padding(.horizontal, 4)
+                                        .background(Color.blue.opacity(0.15))
+                                        .foregroundColor(.blue)
+                                        .cornerRadius(4)
+                                    Text(rw.regexPattern)
+                                        .font(.system(size: 12, design: .monospaced))
+                                }
+                                Text("-> \(rw.replacement)")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.vertical, 2)
+                        }
+                    }
+                }
+
+                if !module.hostOverrides.isEmpty {
+                    Section(header: Text("Host Mappings (\(module.hostOverrides.count))")) {
+                        ForEach(Array(module.hostOverrides.keys), id: \.self) { host in
+                            HStack {
+                                Text(host).font(.system(size: 13, design: .monospaced))
+                                Spacer()
+                                Text(module.hostOverrides[host] ?? "").font(.caption).foregroundColor(.secondary)
                             }
                         }
                     }
@@ -155,7 +215,7 @@ struct ModuleDetailSheet: View {
                 }
 
                 if !module.scripts.isEmpty {
-                    Section(header: Text("Scripts (\(module.scripts.count))")) {
+                    Section(header: Text("JavaScriptCore Scripts (\(module.scripts.count))")) {
                         ForEach(module.scripts) { script in
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(script.name).font(.headline)
